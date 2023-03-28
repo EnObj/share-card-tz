@@ -1,7 +1,7 @@
-console.log('i am chameleon.');
+// console.log('i am chameleon.');
 
 chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
-    console.log(request);
+    // console.log(request);
     if (request.action == 'loadDocument') {
         const list = [{
             type: 'div',
@@ -24,6 +24,12 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     if (request.style) {
         handleStyle(request.style, request.host)
     }
+    if (request.action == 'switchCountdown'){
+        if(request.data && request.data.comingDate){
+            comingDate = new Date(request.data.comingDate)
+        }
+        p5Canvas.style('display', request.data.show ? 'block' : 'none')
+    }
 });
 
 // 直接渲染
@@ -33,7 +39,7 @@ chrome.runtime.sendMessage({
 
 function handleHiddenDom(hiddenDom, host) {
     if (location.host.endsWith(host)) {
-        console.log(host, hiddenDom);
+        // console.log(host, hiddenDom);
         const styleId = 'chameleon1-' + hiddenDom.name
         // 移除
         if (!hiddenDom.checked) {
@@ -51,7 +57,7 @@ function handleHiddenDom(hiddenDom, host) {
 
 function handleStyle(style, host) {
     if (location.host.endsWith(host)) {
-        console.log(host, style);
+        // console.log(host, style);
         const styleId = 'chameleon2-' + style.name
         // 移除
         if (!style.checked) {
@@ -214,4 +220,74 @@ var chameleonReader = {
             }
         }
     }
+}
+
+let myFont;
+let p5Canvas;
+var comingDate = new Date(Date.now() + 1000 * 60 * 60 * 24)
+function preload () {
+    myFont = loadFont('https://enobj-cdn-1252108641.cos.ap-nanjing.myqcloud.com/pabellona-c-triplex.ttf');
+}
+
+function setup () {
+    const width = 400, height = 100;
+    p5Canvas = createCanvas(width, height);
+    const x = Math.floor(screen.availWidth / 2 - width / 2)
+    const y = Math.floor(screen.availHeight / 2 - height / 2)
+    // console.log('三体倒计时', x, y)
+    p5Canvas.position(x, y, 'fixed');
+
+    // 主动查询一次
+    chrome.runtime.sendMessage({
+        action: 'getCountdownConfig',
+    }, function (response) {
+    //   console.log(response, chrome.runtime.lastError)
+      if(response){
+        if(response.comingDate){
+            comingDate = new Date(response.comingDate)
+        }
+        p5Canvas.style('display', response.show ? 'block' : 'none')
+      }
+    });
+}
+
+function draw () {
+    clear();
+    background('rgba(100%,0%,100%,0)');
+
+    fill('#F2921D');
+    textSize(60);
+    textAlign(CENTER, CENTER);
+    textFont(myFont);
+
+    const remainingTime = calculateRemainingTime();
+    if (remainingTime.remainingTime > 1000) {
+        const timeText =
+            "" +
+            getTrueNumber(remainingTime.hours) +
+            " " +
+            getTrueNumber(remainingTime.mins) +
+            " " +
+            getTrueNumber(remainingTime.secs);
+        text(timeText, width / 2, height / 2)
+    } else {
+        text('time over', width / 2, height / 2)
+    }
+}
+
+function calculateRemainingTime () {
+    const now = new Date();
+    const remainingTime = comingDate.getTime() - now.getTime();
+    const days = Math.floor(remainingTime / (1000 * 60 * 60 * 24));
+    const hours = Math.floor(
+        (remainingTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+    );
+    const mins = Math.floor((remainingTime % (1000 * 60 * 60)) / (1000 * 60));
+    const secs = Math.floor((remainingTime % (1000 * 60)) / 1000);
+
+    return { hours: days * 24 + hours, mins, secs, remainingTime };
+}
+
+function getTrueNumber (num) {
+    return num < 10 ? "0" + num : num;
 }
